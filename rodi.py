@@ -59,12 +59,10 @@ class GracefulKiller:
            
 if not len(sys.argv) > 1:
     print("You must provide one numerical argument to this function (duration in seconds). Exiting.")
-    GPIO.cleanup()
     sys.exit(1)
 
 if sys.argv[1] != "close" and sys.argv[1] != "stop" and not sys.argv[1].isdigit():
     print("Value is neither 'close', 'stop' or a refill duration expressed in seconds")
-    GPIO.cleanup()
     sys.exit(1)
 
 i = 0
@@ -74,6 +72,9 @@ Setup()
 if sys.argv[1] == "close" or  sys.argv[1] == "stop":
     Close_valve()
 
+if str.count(subprocess.check_output(["ps", "aux"]), "rodi") > 1:
+    Alert("Warning, we were called while another instance of rodi.py was already in Memory")
+    sys.exit(1)
     
 if GPIO.input(FLOATSW_HIGH_WL) == 0:
     Alert("Water level in sump already high, refilling would be dangerous, exiting")
@@ -115,4 +116,3 @@ if sys.argv[1].isdigit():
 # 2 : a sigkill, sigterm or keyboard CTRL+C signal was received
 # 1 : incorrect parameter received
 # 0 : all went fine
-
