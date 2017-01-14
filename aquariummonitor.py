@@ -10,6 +10,8 @@ Alarms={"WATER_LEAK_DETECTOR_1":0,"WATER_LEAK_DETECTOR_2":0,"FLOATSW_HIGH_WL":0,
 Pins={"WATER_LEAK_DETECTOR_1":23,"WATER_LEAK_DETECTOR_2":24,"FLOATSW_HIGH_WL":13,"FLOATSW_LOW_WL":19,"FLOATSW_LOW_RO_WL":22,"WATER_VALVE":10,"LED_PIN_R":4,"LED_PIN_G":17,"LED_PIN_B":27}                             # GPIO Pins mapping
 Colors={"RED":0xFF0000,"GREEN":0x00FF00,"YELLOW":0xFFFF00,"PURPLE":0xFF00FF,"BLUE":0x00FFFF,"DEEPBLUE":0x0000FF,"WHITE":0xFFFFFF} # Color table
 WATER_VALVE = 10
+PUMP_ON = False
+PUMP_OFF = True
 MAIL_TO = ''                                          # Your destination email for alerts
 MAIL_FROM = ''                                        # The source address for emails (can be non existent)
 MAIL_SUBJECT = 'ALERT AQUARIUM'                       # The subject
@@ -21,7 +23,7 @@ PUSHOVER_TOKEN = ""                                   # your Pushover APP toker
 PUSHOVER_USER = ""                                    # your Pushover USER token
 TEST_FLAG = 0                                         # if in debug mode, set flag to 1 and no mail or pushover will be sent
 LOOP_WAIT_TIMER = 5                                   # defines how many seconds interval between polling
-VERSION = 1.5                                         # Code version number
+VERSION = 1.6                                         # Code version number
 logger = None                                         # empty variable for the logger handler to make it global
 p_R = None
 p_G = None
@@ -45,10 +47,10 @@ def Setup():
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(Pins["FLOATSW_HIGH_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(Pins["FLOATSW_LOW_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(Pins["FLOATSW_LOW_AWC_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)    
+    GPIO.setup(Pins["FLOATSW_LOW_RO_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)    
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_1"], GPIO.IN)
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_2"], GPIO.IN)
-    GPIO.setup(Pins["WATER_VALVE"], GPIO.OUT)
+    GPIO.setup(Pins["WATER_VALVE"], GPIO.OUT, initial = GPIO.HIGH)
     GPIO.setup(Pins["LED_PIN_R"], GPIO.OUT, initial = GPIO.HIGH) #high = leds off
     GPIO.setup(Pins["LED_PIN_G"], GPIO.OUT, initial = GPIO.HIGH)
     GPIO.setup(Pins["LED_PIN_B"], GPIO.OUT, initial = GPIO.HIGH)
@@ -112,14 +114,14 @@ def Send_pushover(pushover_content):
     conn.getresponse()
 
 def Refilling():
-    if GPIO.input(Pins["WATER_VALVE"]) == True:
+    if GPIO.input(Pins["WATER_VALVE"]) == PUMP_ON:
         return True
     else:
         return False
                 
 def Close_RODI():
     if TEST_FLAG == 0:
-        GPIO.output(WATER_VALVE, False)
+        GPIO.output(WATER_VALVE, PUMP_OFF)
         time.sleep(25)
       
 def Send_alert(message):
@@ -147,17 +149,12 @@ def Alert(message, probe):                                              # In any
 def Monitor_probe(probe, mesg):
     if GPIO.input(Pins[probe]) == 0 and Alarms[probe] == 0:             # An alert is detected, for the first time on this probe
         Alert(mesg, probe)                                              # Send the initial Alert
-        if probe == "WATER_LEAK_DETECTOR_1" or "WATER_LEAK_DETECTOR_2": 
-            Audio_alarm()
-            if Refilling() == True:
-                Close_RODI()
         if probe == "FLOATSW_LOW_WL":                                   # if it is a low or high water alarm, we take corrective actions
             if Refilling() == False:
-                Alert("Refilling for " + str(500) + " seconds",probe)   # by refilling            
+                Alert("Refilling for " + str(15) + " seconds",probe)   # by refilling            
                 if TEST_FLAG == 0:
-                    proc = Popen(['python', '/usr/local/python/Aquamonitor/rodi.py', str(500)])
+                    proc = Popen(['python', '/usr/local/aquariummonitor/rodi.py', str(15)])
         if probe == "FLOATSW_HIGH_WL":
-            Audio_alarm()
             if Refilling() == True:                                     # or by stopping the current refill, if need be
                 Alert("High water level in the tank, stopping the current refill.", probe)
                 Close_RODI()
@@ -195,8 +192,6 @@ if sys.argv[1] == "start":
             else:
                 Set_led_color(Colors["GREEN"])
 
-            Monitor_probe("WATER_LEAK_DETECTOR_1","Water leak near RO/DI")     # Monitor the various probes and react accordingly if something happens
-            Monitor_probe("WATER_LEAK_DETECTOR_2","Water leak under the tank")
             Monitor_probe("FLOATSW_LOW_WL","Low water level in the tank")
             Monitor_probe("FLOATSW_HIGH_WL","High water level in the tank")
             Monitor_probe("FLOATSW_LOW_RO_WL","Low water in the AWC reserve") 

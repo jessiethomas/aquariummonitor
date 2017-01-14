@@ -71,10 +71,6 @@ Setup()
 
 if sys.argv[1] == "close" or  sys.argv[1] == "stop":
     Close_valve()
-
-if str.count(subprocess.check_output(["ps", "aux"]), "rodi") > 1:
-    Alert("Warning, we were called while another instance of rodi.py was already in Memory")
-    sys.exit(1)
     
 if GPIO.input(FLOATSW_HIGH_WL) == 0:
     Alert("Water level in sump already high, refilling would be dangerous, exiting")
