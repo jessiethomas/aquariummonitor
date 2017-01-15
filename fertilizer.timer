@@ -1,10 +1,10 @@
 [Unit]
-Description=FERTZ service
+Description=FERTILIZER service
 StopWhenUnneeded=true
 
 [Timer]
 OnCalendar=*-*-* *:00:00
-Unit=fertz.service
+Unit=FERTILIZER.service
 
 [Install]
 WantedBy=multi-user.target
