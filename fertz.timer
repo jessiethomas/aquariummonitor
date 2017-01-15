@@ -1,0 +1,10 @@
+[Unit]
+Description=FERTZ service
+StopWhenUnneeded=true
+
+[Timer]
+OnCalendar=*-*-* *:00:00
+Unit=fertz.service
+
+[Install]
+WantedBy=multi-user.target

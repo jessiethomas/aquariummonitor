@@ -1,0 +1,8 @@
+
+[Unit]
+Description=FERTZ service
+
+[Service]
+Type=forking
+TimeoutStartSec=20
+ExecStart=//usr/local/python/aquariummonitor/fertz.py 8
