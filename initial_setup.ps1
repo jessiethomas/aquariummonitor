@@ -14,11 +14,11 @@ cat ./cmd.temp.txt
 echo ""
 
 #copy files locally to pi
-pscp.exe -r -pw raspberry * pi@192.168.1.159:aquamonitor/
+pscp.exe -p -r -pw raspberry * pi@192.168.1.159:aquamonitor/
 
 #run remote command to setup service
 Remove-Item cmd.temp.txt -Force -ErrorAction SilentlyContinue
-"sudo ./aquamonitor/raspberrypi_setup.sh" | Out-File $comm -Encoding ASCII -Force
+"cd aquamonitor && chmod +x raspberrypi_setup.sh && dos2unix **/* ** && sudo sh -c ./raspberrypi_setup.sh" | Out-File $comm -Encoding ASCII -Force
 putty.exe -ssh pi@192.168.1.159 -pw raspberry -m $comm -sessionlog cmd.temp.txt -t | Out-Null
 echo "Logs for running raspberrypi_setup.sh on pi"
 cat cmd.temp.txt
