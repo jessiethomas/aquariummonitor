@@ -18,7 +18,7 @@ pscp.exe -r -pw raspberry * pi@192.168.1.159:aquamonitor/
 
 #run remote command to setup service
 Remove-Item cmd.temp.txt -Force -ErrorAction SilentlyContinue
-"sudo sh aquamonitor/raspberrypi_setup.sh" | Out-File $comm -Encoding ASCII -Force
+"sudo ./aquamonitor/raspberrypi_setup.sh" | Out-File $comm -Encoding ASCII -Force
 putty.exe -ssh pi@192.168.1.159 -pw raspberry -m $comm -sessionlog cmd.temp.txt -t | Out-Null
 echo "Logs for running raspberrypi_setup.sh on pi"
 cat cmd.temp.txt

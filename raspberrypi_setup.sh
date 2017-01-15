@@ -5,7 +5,7 @@ set -e
 echo "1"
 rm -rf /usr/local/aquamonitor
 mkdir /usr/local/aquamonitor
-cp app/. /usr/local/aquamonitor
+cp -r app/. /usr/local/aquamonitor
 
 #setup service and start
 cp aquamonitor.service /etc/systemd/system
