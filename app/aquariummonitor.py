@@ -9,30 +9,31 @@ from datetime import datetime, timedelta
 Alarms = {"WATER_LEAK_DETECTOR_1": 0, "WATER_LEAK_DETECTOR_2": 0, "FLOATSW_HIGH_WL": 0,
           "FLOATSW_LOW_WL": 0, "FLOATSW_LOW_RO_WL": 0}
 # Alarms_messages/GPIO Pins mapping
-Pins = {"WATER_LEAK_DETECTOR_1": 23, "WATER_LEAK_DETECTOR_2": 24, "FLOATSW_HIGH_WL": 13, "FLOATSW_LOW_WL": 19,
-        "FLOATSW_LOW_RO_WL": 22, "WATER_VALVE": 10, "LED_PIN_R": 4, "LED_PIN_G": 17, "LED_PIN_B": 27}
+Pins = {"WATER_LEAK_DETECTOR_1": 23, "WATER_LEAK_DETECTOR_2": 24, "FLOATSW_HIGH_WL": 12, "FLOATSW_LOW_WL": 13,
+        "FLOATSW_LOW_RO_WL": 19, "WATER_VALVE": 10, "LED_PIN_R": 4, "LED_PIN_G": 17, "LED_PIN_B": 27}
 # Color Table
 Colors = {"RED": 0xFF0000, "GREEN": 0x00FF00, "YELLOW": 0xFFFF00, "PURPLE": 0xFF00FF, "BLUE": 0x00FFFF,
           "DEEPBLUE": 0x0000FF, "WHITE": 0xFFFFFF}
 WATER_VALVE = 10
 PUMP_ON = False
 PUMP_OFF = True
-MAIL_TO = ''                                          # Your destination email for alerts
-MAIL_FROM = ''                                        # The source address for emails (can be non existent)
-MAIL_SUBJECT = 'ALERT AQUARIUM'                       # The subject
-SMTP_AUTH_USERNAME = ''                               # The SMTP server authentication username
-SMTP_AUTH_PASSWD = ''                                 # The SMTP server authentication passwd
-SMTP_SERVER = ""                                      # The SMTP server address
-SMTP_PORT = 25                                        # The SMTP server port
-PUSHOVER_TOKEN = ""                                   # your Pushover APP toker
-PUSHOVER_USER = ""                                    # your Pushover USER token
-TEST_FLAG = 0                                         # if in debug mode, set flag to 1 and no mail or pushover will be sent
-LOOP_WAIT_TIMER = 5                                   # defines how many seconds interval between polling
-VERSION = 1.6                                         # Code version number
+MAIL_TO = ''                                     # Your destination email for alerts
+MAIL_FROM = ''                                   # The source address for emails (can be non existent)
+MAIL_SUBJECT = 'ALERT AQUARIUM'                  # The subject
+SMTP_AUTH_USERNAME = ''                          # The SMTP server authentication username
+SMTP_AUTH_PASSWD = ''                            # The SMTP server authentication passwd
+SMTP_SERVER = ""                                 # The SMTP server address
+SMTP_PORT = 25                                   # The SMTP server port
+PUSHOVER_TOKEN = ""                              # your Pushover APP toker
+PUSHOVER_USER = ""                               # your Pushover USER token
+TEST_FLAG = 0                                    # if in debug mode, set flag to 1 and no mail or pushover will be sent
+LOOP_WAIT_TIMER = 5                              # defines how many seconds interval between polling
+VERSION = 1.7                                    # Code version number
 logger = None                                         # empty variable for the logger handler to make it global
 p_R = None
 p_G = None
 p_B = None
+
 
 
 def Audio_alarm():
@@ -57,7 +58,7 @@ def Setup():
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_1"], GPIO.IN)
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_2"], GPIO.IN)
     GPIO.setup(Pins["WATER_VALVE"], GPIO.OUT, initial=GPIO.HIGH)
-    GPIO.setup(Pins["LED_PIN_R"], GPIO.OUT, initial=GPIO.HIGH)  # high = leds off
+    GPIO.setup(Pins["LED_PIN_R"], GPIO.OUT, initial=GPIO.HIGH)       # high = leds off
     GPIO.setup(Pins["LED_PIN_G"], GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(Pins["LED_PIN_B"], GPIO.OUT, initial=GPIO.HIGH)
     p_R = GPIO.PWM(Pins["LED_PIN_R"], 2000)
@@ -163,16 +164,21 @@ def Alert(message, probe):                                              # In any
         elif Alert_cooldown(probe, 2):                                  # and if we are not in test/debug mode, send the alerts through mail & pushover
             Send_alert("Repeated: " + message)
 
+
 def Monitor_probe(probe, mesg):
-    if GPIO.input(Pins[probe]) == 0 and Alarms[probe] == 0:             # An alert is detected, for the first time on this probe
-        Alert(mesg, probe)                                              # Send the initial Alert
-        if probe == "FLOATSW_LOW_WL":                                   # if it is a low or high water alarm, we take corrective actions
-            if Refilling() == False:
-                Alert("Refilling for " + str(15) + " seconds",probe)   # by refilling            
+    if GPIO.input(Pins[probe]) == 0 and Alarms[probe] == 0:
+        # An alert is detected, for the first time on this probe
+        Alert(mesg, probe)
+        # Send the initial Alert
+        if probe == "FLOATSW_LOW_WL":
+            # if it is a low or high water alarm, we take corrective actions
+            if Refilling() == True:
+                Alert("Refilling water is ", probe)   # by refilling
                 if TEST_FLAG == 0:
-                    proc = Popen(['python', '/usr/local/aquariummonitor/rodi.py', str(15)])
+                    proc = Popen(['python', '/usr/local/aquamonitor/rodi.py', str(15)])
         if probe == "FLOATSW_HIGH_WL":
-            if Refilling() == True:                                     # or by stopping the current refill, if need be
+            if Refilling() == False:
+                # or by stopping the current refill, if need be
                 Alert("High water level in the tank, stopping the current refill.", probe)
                 Close_RODI()
         if probe == "FLOATSW_LOW_RO_WL":
@@ -189,7 +195,7 @@ class GracefulKiller:
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-    def exit_gracefully(self,signum, frame):
+    def exit_gracefully(self, signum, frame):
         self.kill_now = True
 
 if len(sys.argv) <2:
@@ -203,7 +209,7 @@ else:
 if sys.argv[1] == "start":
         Setup()
         killer = GracefulKiller()
-        Alert("Starting Aquamonitor v" + str(VERSION) + " continuous monitoring.", None) # Tell the user we (re)started
+        Alert("Starting Aquamonitor v" + str(VERSION) + " continuous monitoring.", None)    # we (re)started
         while True:                                                                     # Good old infinite loop, what would we be without them?
             if any(x != 0 for x in Alarms.itervalues()):
                 Set_led_color(Colors["RED"])
@@ -212,9 +218,9 @@ if sys.argv[1] == "start":
             else:
                 Set_led_color(Colors["GREEN"])
 
-            Monitor_probe("FLOATSW_LOW_WL","Low water level in the tank")
-            Monitor_probe("FLOATSW_HIGH_WL","High water level in the tank")
-            Monitor_probe("FLOATSW_LOW_RO_WL","Low water in the AWC reserve") 
+            Monitor_probe("FLOATSW_LOW_WL", "Low water level in the tank")
+            Monitor_probe("FLOATSW_HIGH_WL", "High water level in the tank")
+            Monitor_probe("FLOATSW_LOW_RO_WL", "Low water in the RO reserve")
             time.sleep(LOOP_WAIT_TIMER)                                        # Execute loop only every minute to lower CPU footprint
             if killer.kill_now:
                 Alert("Caught a SIGINT or SIGTERM, exiting cleanly", None)
