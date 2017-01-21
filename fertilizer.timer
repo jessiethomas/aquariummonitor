@@ -3,7 +3,7 @@ Description=FERTILIZER service
 StopWhenUnneeded=true
 
 [Timer]
-OnCalendar=*-*-* *:00:00
+OnCalendar=*-*-* 21:00:00
 Unit=FERTILIZER.service
 
 [Install]
