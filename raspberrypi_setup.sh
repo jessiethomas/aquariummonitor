@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+
+#link local files to /usr/local
+rm -rf /usr/local/aquamonitor
+mkdir /usr/local/aquamonitor
+cp -r app/. /usr/local/aquamonitor
+
+#setup service and start
+cp aquamonitor.service /etc/systemd/system
+systemctl enable aquamonitor
+systemctl stop aquamonitor
+systemctl start aquamonitor
+
