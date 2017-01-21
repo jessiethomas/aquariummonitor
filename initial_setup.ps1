@@ -14,7 +14,7 @@ cat ./cmd.temp.txt
 echo ""
 
 #copy files locally to pi
-pscp.exe -p -r -pw raspberry * pi@192.168.1.159:aquamonitor/
+pscp.exe -p -r * pi@192.168.1.159:aquamonitor/
 
 #run remote command to setup service
 Remove-Item cmd.temp.txt -Force -ErrorAction SilentlyContinue
