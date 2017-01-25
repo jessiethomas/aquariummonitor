@@ -1,10 +1,13 @@
 [Unit]
-Description=FERTILIZER service
+Description=Daily FERTILIZER
 StopWhenUnneeded=true
 
 [Timer]
-OnCalendar=*-*-* 21:00:00
-Unit=FERTILIZER.service
+# OnBootSec=10min
+# OnUnitActiveSec=1d
+# Daily at 8am
+OnCalendar=*-*-* 19:00:00
+Persistent=True
 
 [Install]
 WantedBy=multi-user.target

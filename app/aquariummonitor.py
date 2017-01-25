@@ -15,6 +15,9 @@ Pins = {"WATER_LEAK_DETECTOR_1": 23, "WATER_LEAK_DETECTOR_2": 24, "FLOATSW_HIGH_
 Colors = {"RED": 0xFF0000, "GREEN": 0x00FF00, "YELLOW": 0xFFFF00, "PURPLE": 0xFF00FF, "BLUE": 0x00FFFF,
           "DEEPBLUE": 0x0000FF, "WHITE": 0xFFFFFF}
 WATER_VALVE = 10
+FERTILIZER_PUMP_1 = 16
+FERTILIZER_PUMP_2 = 20
+FERTILIZER_PUMP_3 = 21
 PUMP_ON = False
 PUMP_OFF = True
 MAIL_TO = ''                                     # Your destination email for alerts
@@ -58,6 +61,9 @@ def Setup():
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_1"], GPIO.IN)
     GPIO.setup(Pins["WATER_LEAK_DETECTOR_2"], GPIO.IN)
     GPIO.setup(Pins["WATER_VALVE"], GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(FERTILIZER_PUMP_1, GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(FERTILIZER_PUMP_2, GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(FERTILIZER_PUMP_3, GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(Pins["LED_PIN_R"], GPIO.OUT, initial=GPIO.HIGH)       # high = leds off
     GPIO.setup(Pins["LED_PIN_G"], GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(Pins["LED_PIN_B"], GPIO.OUT, initial=GPIO.HIGH)
@@ -211,10 +217,11 @@ if sys.argv[1] == "start":
         killer = GracefulKiller()
         Alert("Starting Aquamonitor v" + str(VERSION) + " continuous monitoring.", None)    # we (re)started
         while True:                                                                     # Good old infinite loop, what would we be without them?
-            if any(x != 0 for x in Alarms.itervalues()):
-                Set_led_color(Colors["RED"])
-            elif Refilling() == True:
+            if Refilling() == True:
                 Set_led_color(Colors["BLUE"])
+
+            elif  any(x != 0 for x in Alarms.itervalues()):
+                Set_led_color(Colors["RED"])
             else:
                 Set_led_color(Colors["GREEN"])
 

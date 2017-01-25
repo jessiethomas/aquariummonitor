@@ -7,7 +7,7 @@
 ## pi setup
 - `sudo apt-get update && sudo apt-get upgrade`
 - install ssh server (see notes below)
-- open powershell to the root directory and run `.\initial_setup.ps1`
+- open powershell to the root directory and run `.\setup_transfer.ps1`
 
 ## debugging
 to view the logs in real time, log into the server and run `tail -f /var/log/aquamonitor.log`

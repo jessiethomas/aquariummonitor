@@ -1,8 +1,8 @@
 [Unit]
-Description=Daily FERTILIZER
+Description=FERTILIZER
 
 [Service]
 Type=forking
 TimeoutStartSec=2000
 TimeoutStopSec=40
-ExecStart=//usr/local/python/aquariummonitor/fertilizer.py 1200
+ExecStart=/usr/bin/python /usr/local/aquamonitor/fertilizer.py 1200
