@@ -61,7 +61,7 @@ if sys.argv[1].isdigit():
         logger.handlers[0].flush()
         fertilization()
         sys.exit()
-    except KeyboardInterrupt:          # cleanup in case we changed our minds and canceled the fertilization with CTRL+C
+    except KeyboardInterrupt:          # cleanup in case we changed our minds and canceled with CTRL+C
         GPIO.output(FERTILIZER_PUMP_1, PUMP_OFF)
         GPIO.output(FERTILIZER_PUMP_2, PUMP_OFF)
         GPIO.output(FERTILIZER_PUMP_3, PUMP_OFF)

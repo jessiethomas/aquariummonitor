@@ -5,21 +5,43 @@ from subprocess import call, Popen, PIPE
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+handler = logging.FileHandler('/var/log/aquamonitor.log')
+handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', "%Y-%m-%d %H:%M:%S")
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
+
+
 # Alarm flags dictionary
-Alarms = {"WATER_LEAK_DETECTOR_1": 0, "WATER_LEAK_DETECTOR_2": 0, "FLOATSW_HIGH_WL": 0,
-          "FLOATSW_LOW_WL": 0, "FLOATSW_LOW_RO_WL": 0}
+alarms = {"FLOATSW_HIGH_WL": 0, "FLOATSW_LOW_WL": 0, "FLOATSW_LOW_RO_WL": 0}
 # Alarms_messages/GPIO Pins mapping
-Pins = {"WATER_LEAK_DETECTOR_1": 23, "WATER_LEAK_DETECTOR_2": 24, "FLOATSW_HIGH_WL": 12, "FLOATSW_LOW_WL": 13,
-        "FLOATSW_LOW_RO_WL": 19, "WATER_VALVE": 10, "LED_PIN_R": 4, "LED_PIN_G": 17, "LED_PIN_B": 27}
+pins = {"WATER_LEAK_DETECTOR_1": 23, "WATER_LEAK_DETECTOR_2": 24, "FLOATSW_HIGH_WL": 12, "FLOATSW_LOW_WL": 13,
+        "FLOATSW_LOW_RO_WL": 19, "LED_PIN_R": 4, "LED_PIN_G": 17, "LED_PIN_B": 27}
 # Color Table
-Colors = {"RED": 0xFF0000, "GREEN": 0x00FF00, "YELLOW": 0xFFFF00, "PURPLE": 0xFF00FF, "BLUE": 0x00FFFF,
+colors = {"RED": 0xFF0000, "GREEN": 0x00FF00, "YELLOW": 0xFFFF00, "PURPLE": 0xFF00FF, "BLUE": 0x00FFFF,
           "DEEPBLUE": 0x0000FF, "WHITE": 0xFFFFFF}
+
 WATER_VALVE = 10
 FERTILIZER_PUMP_1 = 16
 FERTILIZER_PUMP_2 = 20
 FERTILIZER_PUMP_3 = 21
 PUMP_ON = False
 PUMP_OFF = True
+TEST_FLAG = 0                                    # if in debug mode, set flag to 1 and no mail or pushover will be sent
+LOOP_WAIT_TIMER = 5                              # defines how many seconds interval between polling
+VERSION = 1.7                                    # Code version number
+p_r = None
+p_g = None
+p_b = None
+refilling = ''
+
+# Need to fix
 MAIL_TO = ''                                     # Your destination email for alerts
 MAIL_FROM = ''                                   # The source address for emails (can be non existent)
 MAIL_SUBJECT = 'ALERT AQUARIUM'                  # The subject
@@ -29,86 +51,74 @@ SMTP_SERVER = ""                                 # The SMTP server address
 SMTP_PORT = 25                                   # The SMTP server port
 PUSHOVER_TOKEN = ""                              # your Pushover APP toker
 PUSHOVER_USER = ""                               # your Pushover USER token
-TEST_FLAG = 0                                    # if in debug mode, set flag to 1 and no mail or pushover will be sent
-LOOP_WAIT_TIMER = 5                              # defines how many seconds interval between polling
-VERSION = 1.7                                    # Code version number
-logger = None                                         # empty variable for the logger handler to make it global
-p_R = None
-p_G = None
-p_B = None
 
 
+def audio_alarm():
+    logger.info('Entering Audio_alarm')
+    pygame.mixer.init()
+    pygame.mixer.music.load("/usr/local/python/aquariummonitor/alarm.wav")
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy() == True:
+        continue
 
-def Audio_alarm():
-    if TEST_FLAG == 0:
-        pygame.mixer.init()
-        pygame.mixer.music.load("/usr/local/python/aquariummonitor/alarm.wav")
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy() == True:
-            continue
 
-
-def Setup():
+def setup():
     global logger
-    global p_R
-    global p_G
-    global p_B
+    logger.info('Entering Setup')
+    global p_r
+    global p_g
+    global p_b
+    global refilling
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(Pins["FLOATSW_HIGH_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(Pins["FLOATSW_LOW_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(Pins["FLOATSW_LOW_RO_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)    
-    GPIO.setup(Pins["WATER_LEAK_DETECTOR_1"], GPIO.IN)
-    GPIO.setup(Pins["WATER_LEAK_DETECTOR_2"], GPIO.IN)
-    GPIO.setup(Pins["WATER_VALVE"], GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(pins["FLOATSW_HIGH_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(pins["FLOATSW_LOW_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(pins["FLOATSW_LOW_RO_WL"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(WATER_VALVE, GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(FERTILIZER_PUMP_1, GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(FERTILIZER_PUMP_2, GPIO.OUT, initial=GPIO.HIGH)
     GPIO.setup(FERTILIZER_PUMP_3, GPIO.OUT, initial=GPIO.HIGH)
-    GPIO.setup(Pins["LED_PIN_R"], GPIO.OUT, initial=GPIO.HIGH)       # high = leds off
-    GPIO.setup(Pins["LED_PIN_G"], GPIO.OUT, initial=GPIO.HIGH)
-    GPIO.setup(Pins["LED_PIN_B"], GPIO.OUT, initial=GPIO.HIGH)
-    p_R = GPIO.PWM(Pins["LED_PIN_R"], 2000)
-    p_G = GPIO.PWM(Pins["LED_PIN_G"], 2000)
-    p_B = GPIO.PWM(Pins["LED_PIN_B"], 2000)
-    p_R.start(0)
-    p_G.start(0)
-    p_B.start(0)
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    handler = logging.FileHandler('/var/log/aquamonitor.log')
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    # if we are not running from console, redirect the stdout & err to files
-    if not sys.stdout.isatty():
-        sys.stdout = open('/var/log/aquamonitor_stdout.log', 'a')
-        sys.stderr = open('/var/log/aquamonitor_stderr.log', 'a')
+    GPIO.setup(pins["LED_PIN_R"], GPIO.OUT, initial=GPIO.HIGH)       # high = LEDs off
+    GPIO.setup(pins["LED_PIN_G"], GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(pins["LED_PIN_B"], GPIO.OUT, initial=GPIO.HIGH)
+    p_r = GPIO.PWM(pins["LED_PIN_R"], 2000)
+    p_g = GPIO.PWM(pins["LED_PIN_G"], 2000)
+    p_b = GPIO.PWM(pins["LED_PIN_B"], 2000)
+    p_r.start(0)
+    p_g.start(0)
+    p_b.start(0)
+    logger.info('Exiting Setup')
 
 
 def Map(x, in_min, in_max, out_min, out_max):
+    logger.info('Entering map')
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+    logger.info('Exiting map')
 
 
-def Set_led_color(col):                      # For example : col = 0x112233                                 
-    R_val = (col & 0x110000) >> 16
-    G_val = (col & 0x001100) >> 8
-    B_val = (col & 0x000011) >> 0
-    R_val = Map(R_val, 0, 255, 0, 100)
-    G_val = Map(G_val, 0, 255, 0, 100)
-    B_val = Map(B_val, 0, 255, 0, 100)
-    p_R.ChangeDutyCycle(R_val)
-    p_G.ChangeDutyCycle(G_val)
-    p_B.ChangeDutyCycle(B_val)
+def set_led_color(col):                      # For example : col = 0x112233
+    r_val = (col & 0x110000) >> 16
+    g_val = (col & 0x001100) >> 8
+    b_val = (col & 0x000011) >> 0
+    r_val = Map(r_val, 0, 255, 0, 100)
+    g_val = Map(g_val, 0, 255, 0, 100)
+    b_val = Map(b_val, 0, 255, 0, 100)
+    p_r.ChangeDutyCycle(r_val)
+    p_g.ChangeDutyCycle(g_val)
+    p_b.ChangeDutyCycle(b_val)
 
 
-def Stop_led():
-    p_R.stop()
-    p_G.stop()
-    p_B.stop()
+def stop_led():
+    logger.info('Entering stop_led')
+    p_r.stop()
+    p_g.stop()
+    p_b.stop()
+    logger.info('Exiting stop_led')
 
 
-def Send_email(mail_content):
+# Need to fix
+def send_email(mail_content):
+    logger.info('Entering Send_email')
     smtpserver = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
     smtpserver.ehlo()
     smtpserver.starttls()
@@ -120,7 +130,9 @@ def Send_email(mail_content):
     smtpserver.close()
 
 
-def Send_pushover(pushover_content):
+# Need to fix
+def send_pushover(pushover_content):
+    logger.info('Entering Send_pushover')
     conn = httplib.HTTPSConnection("api.pushover.net:443")
     conn.request("POST", "/1/messages.json",
                 urllib.urlencode({
@@ -128,73 +140,95 @@ def Send_pushover(pushover_content):
                 "user": PUSHOVER_USER,
                 "message": pushover_content,
                  }),
-                 { "Content-type": "application/x-www-form-urlencoded" }
+                 {"Content-type": "application/x-www-form-urlencoded" }
                  )
     conn.getresponse()
 
 
-def Refilling():
-    if GPIO.input(Pins["WATER_VALVE"]) == PUMP_ON:
-        return True
-    else:
-        return False
+def close_ro():
+    logger.info('Entering close_ro')
+    GPIO.output(WATER_VALVE, PUMP_OFF)
+    logger.info("Closing the RO/DI valve")
+    logger.info('Exiting close_ro')
 
 
-def Close_RODI():
-    if TEST_FLAG == 0:
-        GPIO.output(WATER_VALVE, PUMP_OFF)
-        time.sleep(25)
+def open_valve():
+    logger.info('Entering open_valve')
+    while GPIO.input(pins["FLOATSW_HIGH_WL"]) == 1 and GPIO.input(pins["FLOATSW_LOW_WL"]) == 0:
+        logger.info("Starting the RO pump")
+        GPIO.output(WATER_VALVE, PUMP_ON)
+        set_led_color(colors["BLUE"])
+    logger.info("Refill done, exiting.")
+    close_ro()
+    sys.exit(0)
+    logger.info('Exiting open_valve')
 
 
-def Send_alert(message):
-    logger.info(message)                                                # log the event
-
+def send_alert(message):
+    logger.info('Entering send_alert')
+    logger.info(message)
     print(message)
 
 
-def Alert_cooldown(probe, timer):
-    if '{:%H:%M}'.format(Alarms[probe] + timedelta(minutes=timer)) == '{:%H:%M}'.format(datetime.now()):
-        Alarms[probe] = datetime.now()                                  # reset alarm timestamp to reset the counter for next iteration
+def alert_cooldown(probe, timer):
+    logger.info('Entering Alert_cooldown')
+    if '{:%H:%M}'.format(alarms[probe] + timedelta(minutes=timer)) == '{:%H:%M}'.format(datetime.now()):
+        alarms[probe] = datetime.now()                                  # reset alarm timestamp to reset the counter
         return True                                                     # time has come to resend an alarm
+        logger.info("alert cooldown true")
     else:
         return False
+        logger.info("alert cooldown false")
 
 
-def Alert(message, probe):                                              # In any event of an alert, inform through log, mail & pushover
-    if probe == None:                                                   # If there is no probe declared 
-        Send_alert(message)                                             # Just send it, and do not repeat
-    else:                                                               # Otherwise, its an alarm and not a stopped alarm
-        if Alarms[probe] == 0:                                          # if the alarm has not been seen recently, set a timestamp and alert
-            Alarms[probe] = datetime.now()                              # set a timestamp for recurring alarm cooldown
-            Send_alert(message)                                         # and alert
-        elif Alert_cooldown(probe, 2):                                  # and if we are not in test/debug mode, send the alerts through mail & pushover
-            Send_alert("Repeated: " + message)
+def alert(message, probe):
+    logger.info('Entering Alert')
+    if probe == None:                                                   # If there is no probe declared
+        logger.info('sending alert message')
+        send_alert(message)                                             # Just send it, and do not repeat
+    else:                                                               # Alarm
+        if alarms[probe] == 0:
+            logger.info(probe)
+            alarms[probe] = datetime.now()                              # set a timestamp for recurring alarm cooldown
+            send_alert(message)                                         # and alert
+        elif alert_cooldown(probe, 2):
+            logger.info('repeating alert')
+            send_alert("Repeated: " + message)
 
 
-def Monitor_probe(probe, mesg):
-    if GPIO.input(Pins[probe]) == 0 and Alarms[probe] == 0:
-        # An alert is detected, for the first time on this probe
-        Alert(mesg, probe)
-        # Send the initial Alert
+def monitor_probe(probe, mesg):
+    logger.info('Entering monitor_probe')
+    if GPIO.input(pins[probe]) == 0 and alarms[probe] == 0:
+        logger.info('alert detected')
         if probe == "FLOATSW_LOW_WL":
-            # if it is a low or high water alarm, we take corrective actions
-            if Refilling() == True:
-                Alert("Refilling water is ", probe)   # by refilling
-                if TEST_FLAG == 0:
-                    proc = Popen(['python', '/usr/local/aquamonitor/rodi.py', str(15)])
-        if probe == "FLOATSW_HIGH_WL":
-            if Refilling() == False:
-                # or by stopping the current refill, if need be
-                Alert("High water level in the tank, stopping the current refill.", probe)
-                Close_RODI()
-        if probe == "FLOATSW_LOW_RO_WL":
-            Alert("The RO water reserve is nearly empty.", probe)
-    if GPIO.input(Pins[probe]) == 1 and Alarms[probe] != 0:             # If we have no longer an alert on the pin but had an alarm previously 
-        Alert(mesg + " stopped", probe)                                 # tell all is back to normal
-        Alarms[probe] = 0                                               # clear the alarm flag
+            logger.info('low water alert')
+            alert("Not refilling, start filling)", probe)
+            logger.info('calling to open_valve')
+            set_led_color(colors["RED"])
+            open_valve()
+        elif probe == "FLOATSW_HIGH_WL":
+            logger.info('high water alert')
+            alert("High water level in the tank, stopping the current refill.", probe)
+            logger.info('setting color to red')
+            set_led_color(colors["RED"])
+            close_ro()
+        elif probe == "FLOATSW_LOW_RO_WL":
+            alert("The RO water reserve is nearly empty.", probe)
+            logger.info('setting color to red')
+            set_led_color(colors["RED"])
+        else:
+            alert('alert not set')
+    elif GPIO.input(pins[probe]) == 1 and alarms[probe] != 0:             # no alarm
+        logger.info('alert cleared')
+        alert(mesg + " stopped", probe)
+        alarms[probe] = 0
+        logger.info('setting color to green')
+        set_led_color(colors["GREEN"])
+    logger.info('Exiting monitor_probe, no alert')
 
 
 class GracefulKiller:
+    logger.info('Entering GracefulKiller')
     kill_now = False
 
     def __init__(self):
@@ -204,38 +238,41 @@ class GracefulKiller:
     def exit_gracefully(self, signum, frame):
         self.kill_now = True
 
-if len(sys.argv) <2:
+if len(sys.argv) < 2:
+    logger.info('Entering len(sys.argv) < 2')
     print("Too few argument provided")
+    close_ro()
     sys.exit(2)
 else:
     if sys.argv[1] != "status" and sys.argv[1] != "start":
         print("Incorrect argument provided, must be either start or status")
+        close_ro()
         sys.exit(2)
     
 if sys.argv[1] == "start":
-        Setup()
-        killer = GracefulKiller()
-        Alert("Starting Aquamonitor v" + str(VERSION) + " continuous monitoring.", None)    # we (re)started
-        while True:                                                                     # Good old infinite loop, what would we be without them?
-            if Refilling() == True:
-                Set_led_color(Colors["BLUE"])
+    logger.info('Entering sys.argv[1] == "start"')
+    setup()
+    killer = GracefulKiller()
+    alert("Starting Aquamonitor v" + str(VERSION) + " continuous monitoring.", None)    # we (re)started
+    logger.info('setting color to green')
+    set_led_color(colors["GREEN"])
+    while True:
+        monitor_probe("FLOATSW_LOW_WL", "Low water level in the tank")
+        monitor_probe("FLOATSW_HIGH_WL", "High water level in the tank")
+        monitor_probe("FLOATSW_LOW_RO_WL", "Low water in the RO reserve")
+        time.sleep(LOOP_WAIT_TIMER)                        # Execute loop only every minute to lower CPU footprint
+        if killer.kill_now:
+            alert("Caught a SIGINT or SIGTERM, exiting cleanly", None)
+            logger.info("Terminating Aquamonitor")
+            close_ro()
+            GPIO.cleanup()
+            stop_led()
+            sys.exit(3)
 
-            elif  any(x != 0 for x in Alarms.itervalues()):
-                Set_led_color(Colors["RED"])
-            else:
-                Set_led_color(Colors["GREEN"])
 
-            Monitor_probe("FLOATSW_LOW_WL", "Low water level in the tank")
-            Monitor_probe("FLOATSW_HIGH_WL", "High water level in the tank")
-            Monitor_probe("FLOATSW_LOW_RO_WL", "Low water in the RO reserve")
-            time.sleep(LOOP_WAIT_TIMER)                                        # Execute loop only every minute to lower CPU footprint
-            if killer.kill_now:
-                Alert("Caught a SIGINT or SIGTERM, exiting cleanly", None)
-                logger.info("Terminating Aquamonitor")
-                Close_RODI()
-                GPIO.cleanup()
-                Stop_led()
-                sys.exit(3)
+if sys.argv[1] == "close" or sys.argv[1] == "stop":
+    close_ro()
+
 
 # Exit code
 # 0 : Normal exit

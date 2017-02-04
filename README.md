@@ -7,6 +7,9 @@
 ## pi setup
 - `sudo apt-get update && sudo apt-get upgrade`
 - install ssh server (see notes below)
+- `sudo apt-get install dos2unix`
+
+## other computer
 - open powershell to the root directory and run `.\setup_transfer.ps1`
 
 ## debugging
