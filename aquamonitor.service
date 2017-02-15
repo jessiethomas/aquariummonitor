@@ -4,7 +4,7 @@ Description=Aquamonitor
 [Service]
 Type=simple
 TimeoutStartSec=5
-ExecStart=/usr/bin/python /usr/local/aquamonitor/aquariummonitor.py start
+ExecStart=/usr/bin/python /usr/local/aquamonitor/aquamonitor.py start
 Restart=always
 RestartSec=5
 
