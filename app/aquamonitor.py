@@ -11,8 +11,8 @@ handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 
-floats = {"HIGH_WL": 12,
-          "LOW_WL": 13,
+floats = {"HIGH_WL": 13,
+          "LOW_WL": 12,
           "LOW_RO_WL": 19}
 
 LED_PIN_R = 4
@@ -89,15 +89,18 @@ def alert(message, probe):
 
 def open_valve():
     global tank_status
-    logger.debug('Entering open_valve')
+#   logger.debug('Entering open_valve')
     logger.info('Starting RO fill')
     tank_status = 'refilling'
     set_led_color(BLUE)
-    logger.debug(GPIO.input(floats["LOW_WL"]))
-    logger.debug(GPIO.input(floats["HIGH_WL"]))
-    logger.debug(GPIO.input(floats["LOW_RO_WL"]))
-    while (GPIO.input(floats["LOW_WL"]) == 0) and (GPIO.input(floats["HIGH_WL"]) == 0):
-        logger.debug("Starting pump loop")
+    while (GPIO.input(floats["LOW_WL"]) == 0) and (GPIO.input(floats["HIGH_WL"]) == 0) and (GPIO.input(floats["LOW_RO_WL"]) == 0) :
+        # logger.debug("Starting pump loop")
+        # logger.debug('Low water float:')
+        # logger.debug(GPIO.input(floats["LOW_WL"]))
+        # logger.debug('High water float:')
+        # logger.debug(GPIO.input(floats["HIGH_WL"]))
+        # logger.debug('RO water float:')
+        # logger.debug(GPIO.input(floats["LOW_RO_WL"]))
         GPIO.output(WATER_VALVE, PUMP_ON)
         time.sleep(LOOP_WAIT_TIMER)
     logger.info("Refill done, exiting.")
@@ -125,21 +128,26 @@ def monitor_probe():
     logger.debug('RO water float:')
     logger.debug(GPIO.input(floats["LOW_RO_WL"]))
     for probe in floats:
-        logger.debug(probe)
         if GPIO.input(floats[probe]) == 0:
             logger.info('alert detected')
             if probe == "LOW_WL":
                 logger.debug('low water alert')
                 alert("Not refilling, start filling", probe)
-                tank_status = 'alert'
+                tank_status = 'refilling'
                 set_led_color(BLUE)
                 open_valve()
             elif probe == "HIGH_WL":
-                logger.debug('high water alert')
-                alert("High water level in the tank, stopping the current refill.", probe)
-                tank_status = 'alert'
-                set_led_color(RED)
-                close_ro()
+                logger.debug('high water alert', probe)
+                if tank_status == 'refilling':
+                    logger.debug('stopping refill')
+                    alert("High water level in the tank, stopping the current refill.", probe)
+                    tank_status = 'alert'
+                    set_led_color(RED)
+                    close_ro()
+                else:
+                    logger.debug('not refilling, cont.')
+                    tank_status = 'normal'
+                    set_led_color(GREEN)
             elif probe == "LOW_RO_WL":
                 logger.debug('RO is getting low')
                 alert("The RO water reserve is nearly empty.", probe)
@@ -168,18 +176,10 @@ class GracefulKiller:
 if sys.argv[1] == "start":
     logger.debug('Entering startup')
     setup()
+    set_led_color(GREEN)
     killer = GracefulKiller()
     alert("Starting Aquamonitor continuous monitoring.", None)
     while True:
-        if tank_status == 'alert':
-            logger.debug('RED')
-            set_led_color(RED)
-        elif tank_status == 'refilling':
-            logger.debug('BLUE')
-            set_led_color(BLUE)
-        else:
-            logger.debug('GREEN')
-            set_led_color(GREEN)
         monitor_probe()
         logger.debug('sleep')
         time.sleep(LOOP_WAIT_TIMER)

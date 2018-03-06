@@ -3,18 +3,18 @@
 
 import sys, signal, logging, time, RPi.GPIO as GPIO
 
-FERTILIZER_PUMP_1 = 16
-FERTILIZER_PUMP_2 = 20
-FERTILIZER_PUMP_3 = 21
-FP1_TIMER = 2
+FERTILIZER_PUMP_1 = 20
+FERTILIZER_PUMP_2 = 21
+FERTILIZER_PUMP_3 = 16
+FP1_TIMER = 4
 FP2_TIMER = 2
-FP3_TIMER = 2
+FP3_TIMER = 10
 PUMP_ON = False
 PUMP_OFF = True
 logger = None
 
 
-def Setup():
+def setup():
     global logger
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -36,22 +36,25 @@ if not len(sys.argv) > 1:
     print "You must provide one numerical argument to this function (duration in seconds). Exiting."
     sys.exit()
 
-Setup()
+setup()
 
 
 def fertilization():
     logger.info("Starting fertilization")
-    logger.info("Starting pump 1")
+    logger.debug("Starting pump 1")
     GPIO.output(FERTILIZER_PUMP_1, PUMP_ON)
     time.sleep(FP1_TIMER)
+    logger.debug(FP1_TIMER)
     GPIO.output(FERTILIZER_PUMP_1, PUMP_OFF)
-    logger.info("Starting pump 2")
+    logger.debug("Starting pump 2")
     GPIO.output(FERTILIZER_PUMP_2, PUMP_ON)
     time.sleep(FP2_TIMER)
+    logger.debug(FP2_TIMER)
     GPIO.output(FERTILIZER_PUMP_2, PUMP_OFF)
-    logger.info("Starting pump 3")
+    logger.debug("Starting pump 3")
     GPIO.output(FERTILIZER_PUMP_3, PUMP_ON)
     time.sleep(FP3_TIMER)
+    logger.debug(FP3_TIMER)
     GPIO.output(FERTILIZER_PUMP_3, PUMP_OFF)
     logger.info("End of fertilization")
 
